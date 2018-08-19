@@ -9,15 +9,20 @@
   .inesmap 0
   .inesmir 1
 
+  .rsset $0000
+sprite_x  .rs 1
+sprite_y  .rs 1
+
   .bank 0
   .org $C000
+
 
 RESET:
   SEI
   CLD
   LDA #$80
-  STA $0050
-  STA $0051
+  STA sprite_x
+  STA sprite_y
   LDA #$00
   STA $0052
 
@@ -144,15 +149,17 @@ Forever:
 
 NMI:
   ; move sprites
-  LDA $0051
+  LDA sprite_y
   STA $0200
-  LDA $0050
+  STA $0204
+  STA $0208
+  LDA sprite_x
   STA $0203
   ADC #$08
   STA $0207
   ADC #$08
   STA $020B
-  INC $0050
+  INC sprite_x
 
   ;; copy sprites back to PPU as the PPU forgets them every cycle.
   ; write address $0200 to PPU for DMA sprite transfer
