@@ -2,18 +2,22 @@
 ; Compile with nesasm
 ; $ nesasm hello_world.asm
 ; Then run .nes file with an NES emulator
-;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; .ines header  
   .inesprg 1
   .ineschr 1
   .inesmap 0
   .inesmir 1
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Variable declarations
   .rsset $0000
 sprite_x .rs 1
 sprite_y .rs 1
 buttons .rs 1
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Subroutine definitions
   .bank 0
   .org $C000
 
@@ -47,8 +51,8 @@ MoveSpritesRight:
   INC sprite_x
   RTS
 
-SetSpritePositions
-  ; move sprites
+SetSpritePositions:
+  ; sprite positions relative to x and y
   LDA sprite_y
   STA $0200
   STA $0204
@@ -76,24 +80,25 @@ HandleControllerInput:
   ;button bit order:
   ; A B select start up down left right
   LDA buttons
-  AND #%00001000 ; up
+  AND #%00001000
   BNE MoveSpritesUp
 
   LDA buttons
-  AND #%00000100 ; down
+  AND #%00000100
   BNE MoveSpritesDown
 
   LDA buttons
-  AND #%00000010 ; left
+  AND #%00000010
   BNE MoveSpritesLeft
 
   LDA buttons
-  AND #%00000001 ; right
+  AND #%00000001
   BNE MoveSpritesRight
 
   RTS
 
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Main program start
 RESET:
   SEI
   CLD
@@ -221,6 +226,11 @@ LoadPalettesLoop:
   STA $2001
 
 
+; Once main program execution hits here, it loops infinitely.
+; VBlank throws NMI interrupt when the screen is done drawing
+; which causes NMI section to run (60x per sec).  All program 
+; logic is currently in NMI, which is not best practice, but 
+; it works at the moment.
 Forever:
   JMP Forever
 
@@ -235,8 +245,13 @@ NMI:
   .org $E000
 
 PaletteData:
-  .db $0F,$31,$32,$33,$0F,$35,$36,$37,$0F,$39,$3A,$3B,$0F,$3D,$3E,$0F  ;background palette data
-  .db $0F,$1C,$15,$19,$0F,$02,$38,$12,$0F,$1C,$15,$16,$0F,$02,$38,$3C  ;sprite palette data
+  ; each palette consists of 4 bytes, starting with $0F (transparent background)
+  ; colors are defined in the PPU and are looked up by bytes. No RGB here.
+
+  ; background palette data
+  .db $0F,$31,$32,$33,$0F,$35,$36,$37,$0F,$39,$3A,$3B,$0F,$3D,$3E,$0F
+  ; sprite palette data
+  .db $0F,$1C,$15,$19,$0F,$02,$38,$12,$0F,$1C,$15,$16,$0F,$02,$38,$3C
 
   ; Register interrupt handlers
   .org $FFFA
