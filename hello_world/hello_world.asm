@@ -10,11 +10,88 @@
   .inesmir 1
 
   .rsset $0000
-sprite_x  .rs 1
-sprite_y  .rs 1
+sprite_x .rs 1
+sprite_y .rs 1
+buttons .rs 1
 
   .bank 0
   .org $C000
+
+
+ReadController:
+  LDA #$01
+  STA $4016
+  LDA #$00
+  STA $4016
+  LDX #$08
+
+ReadControllerLoop:
+  LDA $4016
+  ; use bit shifting to pull lowest bit from controller and put into buttons
+  LSR A
+  ROL buttons
+  DEX
+  BNE ReadControllerLoop
+  RTS
+
+MoveSpritesUp:
+  DEC sprite_y
+  RTS
+MoveSpritesDown:
+  INC sprite_y
+  RTS
+MoveSpritesLeft:
+  DEC sprite_x
+  RTS
+MoveSpritesRight:
+  INC sprite_x
+  RTS
+
+SetSpritePositions
+  ; move sprites
+  LDA sprite_y
+  STA $0200
+  STA $0204
+  STA $0208
+  LDA sprite_x
+  STA $0203
+  ADC #$08
+  STA $0207
+  ADC #$08
+  STA $020B
+  RTS
+
+CopySpritesToPpu:
+  ;; copy sprites back to PPU as the PPU forgets them every cycle.
+  ; write address $0200 to PPU for DMA sprite transfer
+  LDA #$00
+  STA $2003
+  LDA #$02
+  STA $4014
+  RTS
+
+HandleControllerInput:
+  JSR ReadController
+
+  ;button bit order:
+  ; A B select start up down left right
+  LDA buttons
+  AND #%00001000 ; up
+  BNE MoveSpritesUp
+
+  LDA buttons
+  AND #%00000100 ; down
+  BNE MoveSpritesDown
+
+  LDA buttons
+  AND #%00000010 ; left
+  BNE MoveSpritesLeft
+
+  LDA buttons
+  AND #%00000001 ; right
+  BNE MoveSpritesRight
+
+  RTS
 
 
 RESET:
@@ -148,25 +225,9 @@ Forever:
   JMP Forever
 
 NMI:
-  ; move sprites
-  LDA sprite_y
-  STA $0200
-  STA $0204
-  STA $0208
-  LDA sprite_x
-  STA $0203
-  ADC #$08
-  STA $0207
-  ADC #$08
-  STA $020B
-  INC sprite_x
-
-  ;; copy sprites back to PPU as the PPU forgets them every cycle.
-  ; write address $0200 to PPU for DMA sprite transfer
-  LDA #$00
-  STA $2003
-  LDA #$02
-  STA $4014
+  JSR HandleControllerInput
+  JSR SetSpritePositions
+  JSR CopySpritesToPpu
 
   RTI
 
