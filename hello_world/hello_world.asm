@@ -132,82 +132,22 @@ LoadPalettesLoop:
   CPX #$20                      ; Compare X to $20 (decimal 32)
   BNE LoadPalettesLoop          ; (when (not= x 32) (recur))
 
-  ;; SPRITES
-  ;;
-  ;; 1 | Y Position  | $00 = top of screen, $EF = bottom of screen
-  ;; 2 | Tile Number | 0 - 256, tile number for the graphic to be taken from the pattern table.
-  ;; 3 | Attributes  | Holds color and display info:
-  ;;                   76543210
-  ;;                   |||   ||
-  ;;                   |||   ++- Color Palette of sprite.  Choose which set of 4 from the 16 colors to use
-  ;;                   |||
-  ;;                   ||+------ Priority (0: in front of background; 1: behind background)
-  ;;                   |+------- Flip sprite horizontally
-  ;;                   +-------- Flip sprite vertically
-  ;; 4 | X Position  | $00 = left, $F9 = right
-  ;;
-  ;; These 4 bytes repeat 64 times (one set per sprite) to fill the 256 bytes of sprite memory. To edit sprite 0, change bytes $0200-0203, Sprite 1 is $0204-0207, etc.
+LoadSprites:
+  LDX #$00              ; start at 0
+LoadSpritesLoop:
+  LDA sprites, x        ; load data from address (sprites +  x)
+  STA $0200, x          ; store into RAM address ($0200 + x)
+  INX                   ; X = X + 1
+  CPX #$10              ; Compare X to hex $10, decimal 16
+  BNE LoadSpritesLoop   ; Branch to LoadSpritesLoop if compare was Not Equal to zero
+                        ; if compare was equal to 16, keep going down
 
-  ;; PPU Control ($2000)
-  ;;  PPUCTRL ($2000)
-  ;;  76543210
-  ;;  | ||||||
-  ;;  | ||||++- Base nametable address
-  ;;  | ||||    (0 = $2000; 1 = $2400; 2 = $2800; 3 = $2C00)
-  ;;  | |||+--- VRAM address increment per CPU read/write of PPUDATA
-  ;;  | |||     (0: increment by 1, going across; 1: increment by 32, going down)
-  ;;  | ||+---- Sprite pattern table address for 8x8 sprites (0: $0000; 1: $1000)
-  ;;  | |+----- Background pattern table address (0: $0000; 1: $1000)
-  ;;  | +------ Sprite size (0: 8x8; 1: 8x16)
-  ;;  |
-  ;;  +-------- Generate an NMI at the start of the
-  ;;            vertical blanking interval vblank (0: off; 1: on)
-  ;T sprite
-  ;x
-  LDA #$80
-  STA $0203
-  ;y
-  LDA #$80
-  STA $0200
-  ;tile number
-  LDA  #$00
-  STA $0201
-  ; color pallete, flags
-  LDA  #$00
-  STA $0202
-
-  ;o sprite
-  ;x
-  LDA #$84
-  STA $0207
-  ;y
-  LDA #$80
-  STA $0204
-  ;tile number
-  LDA  #$01
-  STA $0205
-  ; color pallete, flags
-  LDA  #$01
-  STA $0206
-
-  ; m sprite
-  ;x
-  LDA #$90
-  STA $020B
-  ;y
-  LDA #$80
-  STA $0208
-  ;tile number
-  LDA  #$02
-  STA $0209
-  ; color pallete, flags
-  LDA  #$02
-  STA $020A
-
-  LDA #%10000000                 ; enable NMI, sprites from pattern table 0
+EnableNMI:
+  LDA #%10000000
   STA $2000
 
-    ;; Set up the PPU
+EnableSprites:
+  ;; Set up the PPU
   ;; PPUMASK ($2001)
   ;;
   ;; 76543210
@@ -252,6 +192,11 @@ PaletteData:
   .db $0F,$31,$32,$33,$0F,$35,$36,$37,$0F,$39,$3A,$3B,$0F,$3D,$3E,$0F
   ; sprite palette data
   .db $0F,$1C,$15,$19,$0F,$02,$38,$12,$0F,$1C,$15,$16,$0F,$02,$38,$3C
+
+sprites:
+  .db $80, $00, $00, $80 ; T sprite
+  .db $80, $01, $01, $84 ; o sprite
+  .db $80, $02, $02, $90 ; o sprite
 
   ; Register interrupt handlers
   .org $FFFA
