@@ -75,13 +75,47 @@ LoadPalettesLoop:
   ;;  |
   ;;  +-------- Generate an NMI at the start of the
   ;;            vertical blanking interval vblank (0: off; 1: on)
-  ;LDA ($0050) ;#$80
+  ;T sprite
+  ;x
   LDA #$80
-  STA $0200                     ; put sprite 0 in center ($80) of screen vertically
-  STA $0203                     ; put sprite 0 in center ($80) of screen horizontally
+  STA $0203
+  ;y
+  LDA #$80
+  STA $0200
+  ;tile number
   LDA  #$00
-  STA $0201                     ; tile number = 0
-  STA $0202                     ; color pallete = 0, no flipping
+  STA $0201
+  ; color pallete, flags
+  LDA  #$00
+  STA $0202
+
+  ;o sprite
+  ;x
+  LDA #$84
+  STA $0207
+  ;y
+  LDA #$80
+  STA $0204
+  ;tile number
+  LDA  #$01
+  STA $0205
+  ; color pallete, flags
+  LDA  #$01
+  STA $0206
+
+  ; m sprite
+  ;x
+  LDA #$90
+  STA $020B
+  ;y
+  LDA #$80
+  STA $0208
+  ;tile number
+  LDA  #$02
+  STA $0209
+  ; color pallete, flags
+  LDA  #$02
+  STA $020A
 
   LDA #%10000000                 ; enable NMI, sprites from pattern table 0
   STA $2000
@@ -101,7 +135,7 @@ LoadPalettesLoop:
   ;; ||+------ Intensify reds (and darken other colors)
   ;; |+------- Intensify greens (and darken other colors)
   ;; +-------- Intensify blues (and darken other colors)
-  LDA #%01010000
+  LDA #%00010000
   STA $2001
 
 
@@ -114,6 +148,10 @@ NMI:
   STA $0200
   LDA $0050
   STA $0203
+  ADC #$08
+  STA $0207
+  ADC #$08
+  STA $020B
   INC $0050
 
   ;; copy sprites back to PPU as the PPU forgets them every cycle.
@@ -130,7 +168,7 @@ NMI:
 
 PaletteData:
   .db $0F,$31,$32,$33,$0F,$35,$36,$37,$0F,$39,$3A,$3B,$0F,$3D,$3E,$0F  ;background palette data
-  .db $0F,$1C,$15,$1A,$0F,$02,$38,$3C,$0F,$1C,$15,$14,$0F,$02,$38,$3C  ;sprite palette data
+  .db $0F,$1C,$15,$19,$0F,$02,$38,$12,$0F,$1C,$15,$16,$0F,$02,$38,$3C  ;sprite palette data
 
   ; Register interrupt handlers
   .org $FFFA
