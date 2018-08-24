@@ -15,21 +15,24 @@ APU_SPR_DMA = $4014
 APU_PAD1 = $4016
 APU_PAD2 = $4017
 
-BTN_CHECK = %00000001
+CRTL2_GRAYSCALE = %00000001
+CRTL2_DISABLE_LEFT_BG_CLIP = %00000010
+CRTL2_DISABLE_LEFT_SPR_CLIP = %00000100
+CRTL2_BACKGROUND_RENDER = %00001000
+CRTL2_SPRITE_RENDER = %00010000
+CRTL2_INTENSE_RED = %00100000
+CRTL2_INTENSE_GREEN = %01000000
+CRTL2_INTENSE_BLUE = %10000000
 
-SPR_ENABLED = %00010000
-BG_ENABLED = %00001000
-NO_L_CLIP = %00000010
-
-NMI_ENABLED = %10000000
-SPRITES_8x16 = %00100000
-BG_PT_ADDR_O = %00010000
-SP_PT_ADDR_O = %00001000
-VRAM_INC = %00000100
-NT_20 = %00000000
-NT_24 = %00000001
-NT_28 = %00000010
-NT_2C = %00000011
+CRTL1_NMI_ENABLED = %10000000
+CRTL1_SPRITES_8x16 = %00100000
+CRTL1_BG_PT_ADDR_1 = %00010000
+CRTL1_SP_PT_ADDR_1 = %00001000
+CRTL1_VRAM_INC = %00000100
+CRTL1_BASE_NAMETABLE_2000 = %00000000
+CRTL1_BASE_NAMETABLE_2400 = %00000001
+CRTL1_BASE_NAMETABLE_2800 = %00000010
+CRTL1_BASE_NAMETABLE_2C00 = %00000011
 
 .segment "HEADER"
 ; the header!
@@ -52,25 +55,16 @@ pointerLow: .res 1
 
 
 .segment "CODE"
-;Reset:
-  ; disable interrupts
-  ;sei
-  ; disable non-functional decimal mode
-  ;cld
-
-  ;.repeat 3
-  ;jsr vblank_cycle
-  ;.endrep
 
 ReadController:
   LDA #$01
-  STA $4016
+  STA APU_PAD1 
   LDA #$00
-  STA $4016
+  STA APU_PAD1 
   LDX #$08
 
 ReadControllerLoop:
-  LDA $4016
+  LDA APU_PAD1 
   ; use bit shifting to pull lowest bit from controller and put into buttons
   LSR A
   ROL buttons
@@ -109,9 +103,9 @@ CopySpritesToPpu:
   ;; copy sprites back to PPU as the PPU forgets them every cycle.
   ; write address $0200 to PPU for DMA sprite transfer
   LDA #$00
-  STA $2003
+  STA PPU_SPR_ADDR
   LDA #$02
-  STA $4014
+  STA APU_SPR_DMA 
   RTS
 
 HandleControllerInput:
@@ -138,8 +132,7 @@ HandleControllerInput:
   RTS
 
 vblank_cycle:
-  ;lda PPU_STATUS
-  lda $2002
+  lda PPU_STATUS 
   bpl vblank_cycle
   rts
 
@@ -155,29 +148,26 @@ Reset:
   LDA #$80
   STA sprite_x
   STA sprite_y
-  LDA #$00
-  STA $0052
 
   ;; Palettes start at PPU address $3F00 and $3F10. To set this address, PPU address port $2006 is used.
-  ;; The port must be written twice, once for the high byte then for the low byte.
   ;;
   ;; This code tells the PPU to set its address to $3F10. Then the PPU data port at $2007 is ready to accept data. The first write will go to the
   ;; address you set ($3F10), then the PPU will automatically increment the address after each read or write.
 LoadPalettes:
   ;read PPU status to reset the high/low latch to high
-  LDA $2002
+  LDA PPU_STATUS 
   ;write 3F00 to set its address there
   LDA #$3F
-  STA $2006
+  STA PPU_VRAM_ADDR2 
   LDA #$00
-  STA $2006
+  STA PPU_VRAM_ADDR2 
 
   LDX #$00
 LoadPalettesLoop:
   ; loop through palettes and write to PPU ($2007)
   ; 32 bytes (0x20)
-  LDA palettes, x
-  STA $2007
+  LDA Palettes, x
+  STA PPU_VRAM_IO 
   INX
   CPX #$20
   BNE LoadPalettesLoop
@@ -185,16 +175,14 @@ LoadPalettesLoop:
 LoadSprites:
   LDX #$00
 LoadSpritesLoop:
-  LDA sprites, x
+  LDA Sprites, x
   STA $0200, x
   INX
   CPX #$10
   BNE LoadSpritesLoop
 
-; todo: replace LoadBackground
-; After some struggling, this was the first background loading subroutine which worked.
 LoadBackground:
-  LDA $2002             ; read PPU status to reset the high/low latch
+  LDA PPU_STATUS
   ; write $2000 address to $2006
   LDA #$20
   STA $2006
@@ -215,7 +203,7 @@ LoadBackground:
   LDY #$00
 @INNER_LOOP:
   LDA (pointerHigh), Y
-  STA $2007
+  STA PPU_VRAM_IO 
   INY
   BNE @INNER_LOOP
   INX
@@ -223,64 +211,72 @@ LoadBackground:
   JMP @OUTER_LOOP
 @LAST_LOOP:
   LDA (pointerHigh), Y
-  STA $2007
+  STA PPU_VRAM_IO 
   INY
   CPY #$A5
   BCC @LAST_LOOP
 
-EnableNMI:
-  LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
-  STA $2000
+SetupPpu:
+  JSR PPU_SETUP
+  JSR EnableSprites
+
+GameLoop:
+  JMP GameLoop
+
+PPU_SETUP:
+  ;LDA #%00000000
+  ;ORA CRTL1_NMI_ENABLED
+  ;;ORA CRTL1_SPRITES_8x16
+  ;ORA CRTL1_BG_PT_ADDR_1
+  ;;ORA CRTL1_SP_PT_ADDR_1
+  ;;ORA CRTL1_VRAM_INC
+  ;;ORA CRTL1_BASE_NAMETABLE_2000
+  ;;ORA CRTL1_BASE_NAMETABLE_2400
+  ;;ORA CRTL1_BASE_NAMETABLE_2800
+  ;;ORA CRTL1_BASE_NAMETABLE_2C00
+  LDA #%10010000
+  STA PPU_CTRL1 
+  RTS
 
 EnableSprites:
-  ;; Set up the PPU
-  ;; PPUMASK ($2001)
-  ;;
-  ;; 76543210
-  ;; ||||||||
-  ;; |||||||+- Grayscale (0: normal color; 1: AND all palette entries
-  ;; |||||||   with 0x30, effectively producing a monochrome display;
-  ;; |||||||   note that colour emphasis STILL works when this is on!)
-  ;; ||||||+-- Disable background clipping in leftmost 8 pixels of screen
-  ;; |||||+--- Disable sprite clipping in leftmost 8 pixels of screen
-  ;; ||||+---- Enable background rendering
-  ;; |||+----- Enable sprite rendering
-  ;; ||+------ Intensify reds (and darken other colors)
-  ;; |+------- Intensify greens (and darken other colors)
-  ;; +-------- Intensify blues (and darken other colors)
+  ;LDA #%00000000
+  ;;ORA CRTL2_GRAYSCALE
+  ;ORA CRTL2_DISABLE_LEFT_BG_CLIP
+  ;ORA CRTL2_DISABLE_LEFT_SPR_CLIP
+  ;ORA CRTL2_BACKGROUND_RENDER
+  ;ORA CRTL2_SPRITE_RENDER
+  ;;ORA CRTL2_INTENSE_RED
+  ;;ORA CRTL2_INTENSE_GREEN
+  ;;ORA CRTL2_INTENSE_BLUE
+  ;;LDA #%00011110
+  ;STA PPU_CTRL2 
+  ;RTS
   LDA #%00011110
-  STA $2001
+  STA PPU_CTRL2
 
-
-; Once main program execution hits here, it loops infinitely.
-; VBlank throws NMI interrupt when the screen is done drawing
-; which causes NMI section to run (60x per sec).  All program 
-; logic is currently in NMI, which is not best practice, but 
-; it works at the moment.
-Forever:
-  JMP Forever
+PpuCleanup:
 
 VBlank:
   JSR HandleControllerInput
   JSR SetSpritePositions
   JSR CopySpritesToPpu
+  JSR PPU_SETUP
+  JSR EnableSprites
 
   ;;This is the PPU clean up section, so rendering the next frame starts properly.
-  LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
-  STA $2000
-  LDA #%00011110   ; enable sprites, enable background, no clipping on left side
-  STA $2001
+  ;LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
+  ;STA PPU_CTRL1 
+  ;LDA #%00011110   ; enable sprites, enable background, no clipping on left side
+  ;STA PPU_CTRL2
   LDA #$00        ;;tell the ppu there is no background scrolling
-  STA $2005
-  STA $2005
+  STA PPU_VRAM_ADDR1 
+  STA PPU_VRAM_ADDR1 
 
   RTI
 
-dummy:
-  rti
+Dummy:
+  RTI
 
-
-;.segment "RODATA"
 Background:
   .byt $10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10
   .byt $10,$40,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$41,$10
@@ -330,7 +326,7 @@ attribute:
   .byt $55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55
   .byt $55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55
 
-palettes:
+Palettes:
   ; each palette consists of 4 bytes, starting with $0F (transparent background)
   ; colors are defined in the PPU and are looked up by bytes. No RGB here.
 
@@ -339,16 +335,14 @@ palettes:
   ; sprite
   .byt $0F,$1C,$15,$19,$0F,$02,$38,$12,$0F,$1C,$15,$16,$0F,$02,$38,$3C
 
-sprites:
+Sprites:
   ;   vert tile attr horiz
   .byt $80, $00, $00, $80 ; T sprite
   .byt $80, $01, $01, $84 ; o sprite
   .byt $80, $02, $02, $90 ; m sprite
 
-  ;.byt $24,$24,$24,$24, $47,$47,$24,$24 ,$47,$47,$47,$47, $47,$47,$24,$24 ,$24,$24,$24,$24 ,$24,$24,$24,$24, $24,$24,$24,$24, $55,$56,$24,$24  ;;brick bottoms
-
 .segment "VECTORS"
-.word VBlank, Reset, dummy
+.word VBlank, Reset, Dummy
 
 .segment "CHRROM"
 .incbin "simple.chr"
