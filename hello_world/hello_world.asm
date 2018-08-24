@@ -131,18 +131,17 @@ HandleControllerInput:
 
   RTS
 
-vblank_cycle:
-  lda PPU_STATUS 
-  bpl vblank_cycle
-  rts
+VBlankCycle:
+  LDA PPU_STATUS 
+  BPL VBlankCycle
+  RTS
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Main program start
+
 Reset:
   SEI
   CLD
   .repeat 3
-  jsr vblank_cycle
+  JSR VBlankCycle
   .endrep
 
   LDA #$80
@@ -220,9 +219,6 @@ SetupPpu:
   JSR PPU_SETUP
   JSR EnableSprites
 
-GameLoop:
-  JMP GameLoop
-
 PPU_SETUP:
   ;LDA #%00000000
   ;ORA CRTL1_NMI_ENABLED
@@ -236,7 +232,6 @@ PPU_SETUP:
   ;;ORA CRTL1_BASE_NAMETABLE_2C00
   LDA #%10010000
   STA PPU_CTRL1 
-  RTS
 
 EnableSprites:
   ;LDA #%00000000
@@ -254,14 +249,18 @@ EnableSprites:
   LDA #%00011110
   STA PPU_CTRL2
 
-PpuCleanup:
+GameLoop:
+  JMP GameLoop
 
 VBlank:
   JSR HandleControllerInput
   JSR SetSpritePositions
   JSR CopySpritesToPpu
-  JSR PPU_SETUP
-  JSR EnableSprites
+
+  LDA #%10010000
+  STA PPU_CTRL1 
+  LDA #%10010000
+  STA PPU_CTRL1 
 
   ;;This is the PPU clean up section, so rendering the next frame starts properly.
   ;LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
