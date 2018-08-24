@@ -1,37 +1,35 @@
 .setcpu "6502"
-; ca65 version kinda works
 
-; defines
-;PPU_CTRL1        = $2000
-;PPU_CTRL2        = $2001
-;PPU_STATUS       = $2002
-;PPU_SPR_ADDR     = $2003
-;PPU_SPR_IO       = $2004
-;PPU_VRAM_ADDR1   = $2005
-;PPU_VRAM_ADDR2   = $2006
-;PPU_VRAM_IO      = $2007
-;
-;APU_MODCTRL      = $4010
-;APU_SPR_DMA      = $4014
-;
-;APU_PAD1         = $4016
-;APU_PAD2         = $4017
-;
-;BTN_CHECK    = %00000001
-;
-;SPR_ENABLED  = %00010000
-;BG_ENABLED   = %00001000
-;NO_L_CLIP    = %00000010
-;
-;NMI_ENABLED  = %10000000
-;SPRITES_8x16 = %00100000
-;BG_PT_ADDR_O = %00010000
-;SP_PT_ADDR_O = %00001000
-;VRAM_INC     = %00000100
-;NT_20        = %00000000
-;NT_24        = %00000001
-;NT_28        = %00000010
-;NT_2C        = %00000011
+PPU_CTRL1 = $2000
+PPU_CTRL2 = $2001
+PPU_STATUS = $2002
+PPU_SPR_ADDR = $2003
+PPU_SPR_IO = $2004
+PPU_VRAM_ADDR1 = $2005
+PPU_VRAM_ADDR2 = $2006
+PPU_VRAM_IO = $2007
+
+APU_MODCTRL = $4010
+APU_SPR_DMA = $4014
+
+APU_PAD1 = $4016
+APU_PAD2 = $4017
+
+BTN_CHECK = %00000001
+
+SPR_ENABLED = %00010000
+BG_ENABLED = %00001000
+NO_L_CLIP = %00000010
+
+NMI_ENABLED = %10000000
+SPRITES_8x16 = %00100000
+BG_PT_ADDR_O = %00010000
+SP_PT_ADDR_O = %00001000
+VRAM_INC = %00000100
+NT_20 = %00000000
+NT_24 = %00000001
+NT_28 = %00000010
+NT_2C = %00000011
 
 .segment "HEADER"
 ; the header!
@@ -45,8 +43,9 @@
 sprite_x: .res 1
 sprite_y: .res 1
 buttons: .res 1
-pointerLo: .res 1
-pointerHi: .res 1
+pointerHigh: .res 1
+pointerLow: .res 1
+
 
 ; General RAM
 ;.segment "BSS"
@@ -194,54 +193,40 @@ LoadSpritesLoop:
 
 ; todo: replace LoadBackground
 ; After some struggling, this was the first background loading subroutine which worked.
-; I don't fully understand it yet and will replace/refactor to fit my style.
-;LoadBackground:
-  ;RTS
-  ;LDA $2002             ; read PPU status to reset the high/low latch
-  ;LDA #$20
-  ;STA $2006             ; write the high byte of $2000 address
-  ;LDA #$00
-  ;STA $2006             ; write the low byte of $2000 address;
-;
-  ;LDA #$00
-  ;STA pointerLo       ; put the low byte of the address of background into pointer
-  ;LDA #HIGH(background)
-  ;STA pointerHi       ; put the high byte of the address into pointer
-  ;
-  ;LDX #$00            ; start at pointer + 0
-  ;LDY #$00
-;OutsideLoop:
-  ;
-;InsideLoop:
-  ;LDA [pointerLo], y  ; copy one background byte from address in pointer plus Y
-  ;STA $2007           ; this runs 256 * 4 times
-  ;
-  ;INY                 ; inside loop counter
-  ;CPY #$00
-  ;BNE InsideLoop      ; run the inside loop 256 times before continuing down
-  ;
-  ;INC pointerHi       ; low byte went 0 to 256, so high byte needs to be changed now
-  ;
-  ;INX
-  ;CPX #$04
-  ;BNE OutsideLoop     ; run the outside loop 256 times before continuing down
-;
-              
-;LoadAttribute:
-;; send attribute data to PPU
-;; $23C0
-  ;LDA $2002
-  ;LDA #$23
-  ;STA $2006
-  ;LDA #$C0
-  ;STA $2006
-  ;LDX #$00
-;LoadAttributeLoop:
-  ;LDA attribute, x
-  ;STA $2007
-  ;INX
-  ;CPX #$08
-  ;BNE LoadAttributeLoop
+LoadBackground:
+  LDA $2002             ; read PPU status to reset the high/low latch
+  ; write $2000 address to $2006
+  LDA #$20
+  STA $2006
+  LDA #$00
+  STA $2006
+
+  LDA #>Background
+  STA pointerLow
+  LDA #<Background 
+  STA pointerHigh
+
+; Need to copy 930 (0x3A2) bytes to PPU
+; 3*255(0xFF) with 165 (0xA5) remainder
+  LDX #$00
+@OUTER_LOOP:
+  CPX #$03
+  BCS @LAST_LOOP
+  LDY #$00
+@INNER_LOOP:
+  LDA (pointerHigh), Y
+  STA $2007
+  INY
+  BNE @INNER_LOOP
+  INX
+  INC pointerLow
+  JMP @OUTER_LOOP
+@LAST_LOOP:
+  LDA (pointerHigh), Y
+  STA $2007
+  INY
+  CPY #$A5
+  BCC @LAST_LOOP
 
 EnableNMI:
   LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
@@ -296,7 +281,7 @@ dummy:
 
 
 ;.segment "RODATA"
-background:
+Background:
   .byt $10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10
   .byt $10,$40,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$31,$41,$10
   .byt $10,$30,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$32,$10
