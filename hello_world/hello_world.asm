@@ -8,35 +8,32 @@ PPU_SPR_IO = $2004
 PPU_VRAM_ADDR1 = $2005
 PPU_VRAM_ADDR2 = $2006
 PPU_VRAM_IO = $2007
+PPU_OAM_DMA = $4014
 
-APU_MODCTRL = $4010
-APU_SPR_DMA = $4014
+CONTROLLER_PORT1 = $4016
+CONTROLLER_PORT2 = $4017
 
-APU_PAD1 = $4016
-APU_PAD2 = $4017
+CRTL2_GRAYSCALE = 1 ; #%00000001
+CRTL2_DISABLE_LEFT_BG_CLIP = 2 ; #%00000010
+CRTL2_DISABLE_LEFT_SPR_CLIP = 4 ; #%00000100
+CRTL2_BACKGROUND_RENDER = 8 ; #%00001000
+CRTL2_SPRITE_RENDER = 16 ; #%00010000
+CRTL2_INTENSE_RED = 32 ; #%00100000
+CRTL2_INTENSE_GREEN = 64 ; #%01000000
+CRTL2_INTENSE_BLUE = 128 ; #%10000000
 
-CRTL2_GRAYSCALE = %00000001
-CRTL2_DISABLE_LEFT_BG_CLIP = %00000010
-CRTL2_DISABLE_LEFT_SPR_CLIP = %00000100
-CRTL2_BACKGROUND_RENDER = %00001000
-CRTL2_SPRITE_RENDER = %00010000
-CRTL2_INTENSE_RED = %00100000
-CRTL2_INTENSE_GREEN = %01000000
-CRTL2_INTENSE_BLUE = %10000000
-
-CRTL1_NMI_ENABLED = %10000000
-CRTL1_SPRITES_8x16 = %00100000
-CRTL1_BG_PT_ADDR_1 = %00010000
-CRTL1_SP_PT_ADDR_1 = %00001000
-CRTL1_VRAM_INC = %00000100
-CRTL1_BASE_NAMETABLE_2000 = %00000000
-CRTL1_BASE_NAMETABLE_2400 = %00000001
-CRTL1_BASE_NAMETABLE_2800 = %00000010
-CRTL1_BASE_NAMETABLE_2C00 = %00000011
+CRTL1_NMI_ENABLED = 128 ; #%10000000
+CRTL1_SPRITES_8x16 = 32 ; #%00100000
+CRTL1_BG_PT_ADDR_1 = 16 ; #%00010000
+CRTL1_SP_PT_ADDR_1 = 8 ; #%00001000
+CRTL1_VRAM_INC =  4 ; #%00000100
+CRTL1_BASE_NAMETABLE_2000 = 0 ; #%00000000
+CRTL1_BASE_NAMETABLE_2400 = 1 ; #%00000001
+CRTL1_BASE_NAMETABLE_2800 = 2 ; #%00000010
+CRTL1_BASE_NAMETABLE_2C00 = 3 ; #%00000011
 
 .segment "HEADER"
-; the header!
-.byte "NES", $1a ; ines header
+.byte "NES", $1a
 .byte 1 ; PRG-ROM pages (16kb)
 .byte $01 ; CHR-ROM pages (8kb)
 
@@ -45,7 +42,7 @@ CRTL1_BASE_NAMETABLE_2C00 = %00000011
 .segment "ZEROPAGE"
 sprite_x: .res 1
 sprite_y: .res 1
-buttons: .res 1
+controller1: .res 1
 pointerHigh: .res 1
 pointerLow: .res 1
 
@@ -58,16 +55,16 @@ pointerLow: .res 1
 
 ReadController:
   LDA #$01
-  STA APU_PAD1 
+  STA CONTROLLER_PORT1 
   LDA #$00
-  STA APU_PAD1 
+  STA CONTROLLER_PORT1 
   LDX #$08
 
 ReadControllerLoop:
-  LDA APU_PAD1 
+  LDA CONTROLLER_PORT1 
   ; use bit shifting to pull lowest bit from controller and put into buttons
   LSR A
-  ROL buttons
+  ROL controller1
   DEX
   BNE ReadControllerLoop
   RTS
@@ -105,7 +102,7 @@ CopySpritesToPpu:
   LDA #$00
   STA PPU_SPR_ADDR
   LDA #$02
-  STA APU_SPR_DMA 
+  STA PPU_OAM_DMA 
   RTS
 
 HandleControllerInput:
@@ -113,19 +110,19 @@ HandleControllerInput:
 
   ;button bit order:
   ; A B select start up down left right
-  LDA buttons
+  LDA controller1
   AND #%00001000
   BNE MoveSpritesUp
 
-  LDA buttons
+  LDA controller1
   AND #%00000100
   BNE MoveSpritesDown
 
-  LDA buttons
+  LDA controller1
   AND #%00000010
   BNE MoveSpritesLeft
 
-  LDA buttons
+  LDA controller1
   AND #%00000001
   BNE MoveSpritesRight
 
@@ -220,6 +217,8 @@ SetupPpu:
   JSR EnableSprites
 
 PPU_SETUP:
+  ;; Still can't get these to work correctly yet.
+  ;; I must be misunderstanding how constants are used in CA65
   ;LDA #%00000000
   ;ORA CRTL1_NMI_ENABLED
   ;;ORA CRTL1_SPRITES_8x16
