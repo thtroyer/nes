@@ -146,41 +146,33 @@ Reset:
   STA sprite_x
   STA sprite_y
 
-  ;; Palettes start at PPU address $3F00 and $3F10. To set this address, PPU address port $2006 is used.
-  ;;
-  ;; This code tells the PPU to set its address to $3F10. Then the PPU data port at $2007 is ready to accept data. The first write will go to the
-  ;; address you set ($3F10), then the PPU will automatically increment the address after each read or write.
 LoadPalettes:
-  ;read PPU status to reset the high/low latch to high
   LDA PPU_STATUS 
-  ;write 3F00 to set its address there
   LDA #$3F
   STA PPU_VRAM_ADDR2 
   LDA #$00
   STA PPU_VRAM_ADDR2 
 
   LDX #$00
-LoadPalettesLoop:
-  ; loop through palettes and write to PPU ($2007)
-  ; 32 bytes (0x20)
+@LoadPalettesLoop:
   LDA Palettes, x
   STA PPU_VRAM_IO 
   INX
+  ; 32 bytes (0x20)
   CPX #$20
-  BNE LoadPalettesLoop
+  BNE @LoadPalettesLoop
 
 LoadSprites:
   LDX #$00
-LoadSpritesLoop:
+@LoadSpritesLoop:
   LDA Sprites, x
   STA $0200, x
   INX
   CPX #$10
-  BNE LoadSpritesLoop
+  BNE @LoadSpritesLoop
 
 LoadBackground:
   LDA PPU_STATUS
-  ; write $2000 address to $2006
   LDA #$20
   STA $2006
   LDA #$00
@@ -212,10 +204,6 @@ LoadBackground:
   INY
   CPY #$A5
   BCC @LAST_LOOP
-
-SetupPpu:
-  JSR PPU_SETUP
-  JSR EnableSprites
 
 PPU_SETUP:
   ;; Still can't get these to work correctly yet.
@@ -326,7 +314,7 @@ attribute:
   .byte $55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55,$55
 
 Palettes:
-  ; each palette consists of 4 bytes, starting with $0F (transparent background)
+  ; each palette consists of 4 bytes, starting with $0F (transparent)
   ; colors are defined in the PPU and are looked up by bytes. No RGB here.
 
   ; background
@@ -344,4 +332,4 @@ Sprites:
 .word VBlank, Reset, Dummy
 
 .segment "CHRROM"
-.incbin "simple.chr"
+.incbin "hello.chr"
