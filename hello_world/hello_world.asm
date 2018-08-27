@@ -60,13 +60,13 @@ ReadController:
   STA CONTROLLER_PORT1 
   LDX #$08
 
-ReadControllerLoop:
+@ReadControllerLoop:
   LDA CONTROLLER_PORT1 
   ; use bit shifting to pull lowest bit from controller and put into buttons
   LSR A
   ROL controller1
   DEX
-  BNE ReadControllerLoop
+  BNE @ReadControllerLoop
   RTS
 
 MoveSpritesUp:
