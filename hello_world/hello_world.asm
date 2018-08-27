@@ -90,6 +90,7 @@ SetSpritePositions:
   STA $0208
   LDA sprite_x
   STA $0203
+  CLC
   ADC #$08
   STA $0207
   ADC #$08
