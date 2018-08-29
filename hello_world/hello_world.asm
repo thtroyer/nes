@@ -1,8 +1,10 @@
 .setcpu "6502"
+.MACPACK generic
+.MACPACK longbranch
 
 PPU_CTRL1 = $2000
 PPU_CTRL2 = $2001
-PPU_STATUS = $2002
+PPU_staTUS = $2002
 PPU_SPR_ADDR = $2003
 PPU_SPR_IO = $2004
 PPU_VRAM_ADDR1 = $2005
@@ -10,8 +12,8 @@ PPU_VRAM_ADDR2 = $2006
 PPU_VRAM_IO = $2007
 PPU_OAM_DMA = $4014
 
-CONTROLLER_PORT1 = $4016
-CONTROLLER_PORT2 = $4017
+CONTrolLER_PORT1 = $4016
+CONTrolLER_PORT2 = $4017
 
 CRTL2_GRAYSCALE = 1 ; #%00000001
 CRTL2_DISABLE_LEFT_BG_CLIP = 2 ; #%00000010
@@ -26,7 +28,7 @@ CRTL1_NMI_ENABLED = 128 ; #%10000000
 CRTL1_SPRITES_8x16 = 32 ; #%00100000
 CRTL1_BG_PT_ADDR_1 = 16 ; #%00010000
 CRTL1_SP_PT_ADDR_1 = 8 ; #%00001000
-CRTL1_VRAM_INC =  4 ; #%00000100
+CRTL1_VRAM_inc =  4 ; #%00000100
 CRTL1_BASE_NAMETABLE_2000 = 0 ; #%00000000
 CRTL1_BASE_NAMETABLE_2400 = 1 ; #%00000001
 CRTL1_BASE_NAMETABLE_2800 = 2 ; #%00000010
@@ -45,7 +47,7 @@ sprite_y: .res 1
 controller1: .res 1
 pointerHigh: .res 1
 pointerLow: .res 1
-
+isInvisible: .res 1
 
 ; General RAM
 ;.segment "BSS"
@@ -54,218 +56,262 @@ pointerLow: .res 1
 .segment "CODE"
 
 ReadController:
-  LDA #$01
-  STA CONTROLLER_PORT1 
-  LDA #$00
-  STA CONTROLLER_PORT1 
-  LDX #$08
+  lda #$01
+  sta CONTrolLER_PORT1 
+  lda #$00
+  sta CONTrolLER_PORT1 
+  ldx #$08
 
 @ReadControllerLoop:
-  LDA CONTROLLER_PORT1 
+  lda CONTrolLER_PORT1 
   ; use bit shifting to pull lowest bit from controller and put into buttons
-  LSR A
-  ROL controller1
-  DEX
-  BNE @ReadControllerLoop
-  RTS
+  lsr A
+  rol controller1
+  dex
+  bne @ReadControllerLoop
+  rts
 
 MoveSpritesUp:
-  DEC sprite_y
-  RTS
+  dec sprite_y
+  rts
 MoveSpritesDown:
-  INC sprite_y
-  RTS
+  inc sprite_y
+  rts
 MoveSpritesLeft:
-  DEC sprite_x
-  RTS
+  dec sprite_x
+  rts
 MoveSpritesRight:
-  INC sprite_x
-  RTS
+  inc sprite_x
+  rts
+ToggleInvisibility:
+  lda isInvisible
+  ;eor #%00000001
+  eor #01
+  sta isInvisible
+  rts
 
 SetSpritePositions:
   ; sprite positions relative to x and y
-  LDA sprite_y
-  STA $0200
-  STA $0204
-  STA $0208
-  LDA sprite_x
-  STA $0203
-  CLC
-  ADC #$08
-  STA $0207
-  ADC #$08
-  STA $020B
-  RTS
+  lda isInvisible
+  ;and #%00000001
+  ;cmp #%00000001
+  cmp #01
+  beq @Else
+
+  lda sprite_y
+  sta $0200
+  sta $0204
+  sta $0208
+  lda sprite_x
+  sta $0203
+  clc
+  adc #$08
+  sta $0207
+  adc #$08
+  sta $020B
+  jmp @Return
+@Else:
+  lda #$02
+  sta $0200
+  sta $0204
+  sta $0208
+  lda #$02
+  sta $0203
+  clc
+  adc #$08
+  sta $0207
+  adc #$08
+  sta $020B
+
+@Return:
+  rts
+
+SetUpVariables:
+  lda #$00
+  sta isInvisible
+  rts
 
 CopySpritesToPpu:
   ;; copy sprites back to PPU as the PPU forgets them every cycle.
   ; write address $0200 to PPU for DMA sprite transfer
-  LDA #$00
-  STA PPU_SPR_ADDR
-  LDA #$02
-  STA PPU_OAM_DMA 
-  RTS
+
+  lda #$00
+  sta PPU_SPR_ADDR
+  lda #$02
+  sta PPU_OAM_DMA 
+  rts
 
 HandleControllerInput:
-  JSR ReadController
+  jsr ReadController
 
   ;button bit order:
   ; A B select start up down left right
-  LDA controller1
-  AND #%00001000
-  BNE MoveSpritesUp
+  lda controller1
+  and #%00001000
+  cmp #%00001000
+  beq MoveSpritesUp
 
-  LDA controller1
-  AND #%00000100
-  BNE MoveSpritesDown
+  lda controller1
+  and #%00000100
+  cmp #%00000100
+  beq MoveSpritesDown
 
-  LDA controller1
-  AND #%00000010
-  BNE MoveSpritesLeft
+  lda controller1
+  and #%00000010
+  cmp #%00000010
+  beq MoveSpritesLeft
 
-  LDA controller1
-  AND #%00000001
-  BNE MoveSpritesRight
+  lda controller1
+  and #%00000001
+  cmp #%00000001
+  beq MoveSpritesRight
 
-  RTS
+  lda controller1
+  and #%10000000
+  cmp #%10000000
+  jeq MoveSpritesRight
+  ;jeq ToggleInvisibility
+
+  rts
 
 VBlankCycle:
-  LDA PPU_STATUS 
-  BPL VBlankCycle
-  RTS
+  lda PPU_staTUS 
+  bpl VBlankCycle
+  rts
 
 
 Reset:
-  SEI
-  CLD
+  sei
+  cld
   .repeat 3
-  JSR VBlankCycle
+  jsr VBlankCycle
   .endrep
 
-  LDA #$80
-  STA sprite_x
-  STA sprite_y
+  lda #$80
+  sta sprite_x
+  sta sprite_y
 
 LoadPalettes:
-  LDA PPU_STATUS 
-  LDA #$3F
-  STA PPU_VRAM_ADDR2 
-  LDA #$00
-  STA PPU_VRAM_ADDR2 
+  lda PPU_staTUS 
+  lda #$3F
+  sta PPU_VRAM_ADDR2 
+  lda #$00
+  sta PPU_VRAM_ADDR2 
 
-  LDX #$00
+  ldx #$00
 @LoadPalettesLoop:
-  LDA Palettes, x
-  STA PPU_VRAM_IO 
-  INX
+  lda Palettes, x
+  sta PPU_VRAM_IO 
+  inx
   ; 32 bytes (0x20)
-  CPX #$20
-  BNE @LoadPalettesLoop
+  cpx #$20
+  bne @LoadPalettesLoop
 
 LoadSprites:
-  LDX #$00
+  ldx #$00
 @LoadSpritesLoop:
-  LDA Sprites, x
-  STA $0200, x
-  INX
-  CPX #$10
-  BNE @LoadSpritesLoop
+  lda Sprites, x
+  sta $0200, x
+  inx
+  cpx #$10
+  bne @LoadSpritesLoop
 
 LoadBackground:
-  LDA PPU_STATUS
-  LDA #$20
-  STA $2006
-  LDA #$00
-  STA $2006
+  lda PPU_staTUS
+  lda #$20
+  sta $2006
+  lda #$00
+  sta $2006
 
-  LDA #>Background
-  STA pointerLow
-  LDA #<Background 
-  STA pointerHigh
+  lda #>Background
+  sta pointerLow
+  lda #<Background 
+  sta pointerHigh
 
 ; Need to copy 930 (0x3A2) bytes to PPU
 ; 3*255(0xFF) with 165 (0xA5) remainder
-  LDX #$00
+  ldx #$00
 @OUTER_LOOP:
-  CPX #$03
-  BCS @LAST_LOOP
-  LDY #$00
+  cpx #$03
+  bcs @LAST_LOOP
+  ldy #$00
 @INNER_LOOP:
-  LDA (pointerHigh), Y
-  STA PPU_VRAM_IO 
-  INY
-  BNE @INNER_LOOP
-  INX
-  INC pointerLow
-  JMP @OUTER_LOOP
+  lda (pointerHigh), Y
+  sta PPU_VRAM_IO 
+  iny
+  bne @INNER_LOOP
+  inx
+  inc pointerLow
+  jmp @OUTER_LOOP
 @LAST_LOOP:
-  LDA (pointerHigh), Y
-  STA PPU_VRAM_IO 
-  INY
-  CPY #$A5
-  BCC @LAST_LOOP
+  lda (pointerHigh), Y
+  sta PPU_VRAM_IO 
+  iny
+  cpy #$A5
+  bcc @LAST_LOOP
 
 PPU_SETUP:
   ;; Still can't get these to work correctly yet.
   ;; I must be misunderstanding how constants are used in CA65
-  ;LDA #%00000000
-  ;ORA CRTL1_NMI_ENABLED
-  ;;ORA CRTL1_SPRITES_8x16
-  ;ORA CRTL1_BG_PT_ADDR_1
-  ;;ORA CRTL1_SP_PT_ADDR_1
-  ;;ORA CRTL1_VRAM_INC
-  ;;ORA CRTL1_BASE_NAMETABLE_2000
-  ;;ORA CRTL1_BASE_NAMETABLE_2400
-  ;;ORA CRTL1_BASE_NAMETABLE_2800
-  ;;ORA CRTL1_BASE_NAMETABLE_2C00
-  LDA #%10010000
-  STA PPU_CTRL1 
+  ;lda #%00000000
+  ;ora CRTL1_NMI_ENABLED
+  ;;ora CRTL1_SPRITES_8x16
+  ;ora CRTL1_BG_PT_ADDR_1
+  ;;ora CRTL1_SP_PT_ADDR_1
+  ;;ora CRTL1_VRAM_inc
+  ;;ora CRTL1_BASE_NAMETABLE_2000
+  ;;ora CRTL1_BASE_NAMETABLE_2400
+  ;;ora CRTL1_BASE_NAMETABLE_2800
+  ;;ora CRTL1_BASE_NAMETABLE_2C00
+  lda #%10010000
+  sta PPU_CTRL1 
 
 EnableSprites:
-  ;LDA #%00000000
-  ;;ORA CRTL2_GRAYSCALE
-  ;ORA CRTL2_DISABLE_LEFT_BG_CLIP
-  ;ORA CRTL2_DISABLE_LEFT_SPR_CLIP
-  ;ORA CRTL2_BACKGROUND_RENDER
-  ;ORA CRTL2_SPRITE_RENDER
-  ;;ORA CRTL2_INTENSE_RED
-  ;;ORA CRTL2_INTENSE_GREEN
-  ;;ORA CRTL2_INTENSE_BLUE
-  ;;LDA #%00011110
-  ;STA PPU_CTRL2 
-  ;RTS
-  LDA #%00011110
-  STA PPU_CTRL2
+  ;lda #%00000000
+  ;;ora CRTL2_GRAYSCALE
+  ;ora CRTL2_DISABLE_LEFT_BG_CLIP
+  ;ora CRTL2_DISABLE_LEFT_SPR_CLIP
+  ;ora CRTL2_BACKGROUND_RENDER
+  ;ora CRTL2_SPRITE_RENDER
+  ;;ora CRTL2_INTENSE_RED
+  ;;ora CRTL2_INTENSE_GREEN
+  ;;ora CRTL2_INTENSE_BLUE
+  ;;lda #%00011110
+  ;sta PPU_CTRL2 
+  ;rts
+  lda #%00011110
+  sta PPU_CTRL2
 
 GameLoop:
-  JMP GameLoop
+  jmp GameLoop
 
 VBlank:
-  JSR HandleControllerInput
-  JSR SetSpritePositions
-  JSR CopySpritesToPpu
+  jsr HandleControllerInput
+  jsr SetSpritePositions
+  ;jsr SetUpVariables
+  jsr CopySpritesToPpu
 
-  LDA #%10010000
-  STA PPU_CTRL1 
-  LDA #%10010000
-  STA PPU_CTRL1 
+  lda #%10010000
+  sta PPU_CTRL1 
+  lda #%10010000
+  sta PPU_CTRL1 
 
-  LDA #%00011110
-  STA PPU_CTRL2
+  lda #%00011110
+  sta PPU_CTRL2
 
   ;;This is the PPU clean up section, so rendering the next frame starts properly.
-  ;LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
-  ;STA PPU_CTRL1 
-  ;LDA #%00011110   ; enable sprites, enable background, no clipping on left side
-  ;STA PPU_CTRL2
-  LDA #$00        ;;tell the ppu there is no background scrolling
-  STA PPU_VRAM_ADDR1 
-  STA PPU_VRAM_ADDR1 
+  ;lda #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
+  ;sta PPU_CTRL1 
+  ;lda #%00011110   ; enable sprites, enable background, no clipping on left side
+  ;sta PPU_CTRL2
+  lda #$00        ;;tell the ppu there is no background scrolling
+  sta PPU_VRAM_ADDR1 
+  sta PPU_VRAM_ADDR1 
 
-  RTI
+  rti
 
 Dummy:
-  RTI
+  rti
 
 Background:
   .byte $10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10,$10
