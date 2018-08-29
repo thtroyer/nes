@@ -250,6 +250,9 @@ VBlank:
   LDA #%10010000
   STA PPU_CTRL1 
 
+  LDA #%00011110
+  STA PPU_CTRL2
+
   ;;This is the PPU clean up section, so rendering the next frame starts properly.
   ;LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
   ;STA PPU_CTRL1 
