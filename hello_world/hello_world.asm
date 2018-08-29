@@ -42,6 +42,7 @@ CRTL1_BASE_NAMETABLE_2C00 = 3 ; #%00000011
 
 ; Zero page RAM
 .segment "ZEROPAGE"
+a_latch: .res 1
 sprite_x: .res 1
 sprite_y: .res 1
 controller1: .res 1
@@ -84,10 +85,23 @@ MoveSpritesRight:
   inc sprite_x
   rts
 ToggleInvisibility:
+  lda a_latch
+  cmp #01
+  beq @Done
+
+  lda #01
+  sta a_latch
+
   lda isInvisible
-  ;eor #%00000001
-  eor #01
+  cmp #01
+  beq @ResetInv
+  lda #01
   sta isInvisible
+  jmp @Done
+@ResetInv:
+  lda #00
+  sta isInvisible
+@Done:
   rts
 
 SetSpritePositions:
@@ -111,11 +125,11 @@ SetSpritePositions:
   sta $020B
   jmp @Return
 @Else:
-  lda #$02
+  lda #$FF
   sta $0200
   sta $0204
   sta $0208
-  lda #$02
+  lda #$FF
   sta $0203
   clc
   adc #$08
@@ -179,8 +193,12 @@ HandleControllerInput:
   cmp #%10000000
   jne @SkipA 
   jsr ToggleInvisibility
+  jmp @DoneA
 @SkipA:
+  lda #00
+  sta a_latch
 
+@DoneA:
   rts
 
 VBlankCycle:
