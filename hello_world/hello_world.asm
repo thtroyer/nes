@@ -4,7 +4,7 @@
 
 PPU_CTRL1 = $2000
 PPU_CTRL2 = $2001
-PPU_staTUS = $2002
+PPU_STATUS = $2002
 PPU_SPR_ADDR = $2003
 PPU_SPR_IO = $2004
 PPU_VRAM_ADDR1 = $2005
@@ -12,8 +12,8 @@ PPU_VRAM_ADDR2 = $2006
 PPU_VRAM_IO = $2007
 PPU_OAM_DMA = $4014
 
-CONTrolLER_PORT1 = $4016
-CONTrolLER_PORT2 = $4017
+CONTROLLER_PORT1 = $4016
+CONTROLLER_PORT2 = $4017
 
 CRTL2_GRAYSCALE = 1 ; #%00000001
 CRTL2_DISABLE_LEFT_BG_CLIP = 2 ; #%00000010
@@ -28,7 +28,7 @@ CRTL1_NMI_ENABLED = 128 ; #%10000000
 CRTL1_SPRITES_8x16 = 32 ; #%00100000
 CRTL1_BG_PT_ADDR_1 = 16 ; #%00010000
 CRTL1_SP_PT_ADDR_1 = 8 ; #%00001000
-CRTL1_VRAM_inc =  4 ; #%00000100
+CRTL1_VRAM_INC =  4 ; #%00000100
 CRTL1_BASE_NAMETABLE_2000 = 0 ; #%00000000
 CRTL1_BASE_NAMETABLE_2400 = 1 ; #%00000001
 CRTL1_BASE_NAMETABLE_2800 = 2 ; #%00000010
@@ -57,13 +57,13 @@ isInvisible: .res 1
 
 ReadController:
   lda #$01
-  sta CONTrolLER_PORT1 
+  sta CONTROLLER_PORT1 
   lda #$00
-  sta CONTrolLER_PORT1 
+  sta CONTROLLER_PORT1 
   ldx #$08
 
 @ReadControllerLoop:
-  lda CONTrolLER_PORT1 
+  lda CONTROLLER_PORT1 
   ; use bit shifting to pull lowest bit from controller and put into buttons
   lsr A
   rol controller1
@@ -149,33 +149,42 @@ HandleControllerInput:
   lda controller1
   and #%00001000
   cmp #%00001000
-  beq MoveSpritesUp
+  bne @SkipUp
+  jsr MoveSpritesUp
+@SkipUp:
 
   lda controller1
   and #%00000100
   cmp #%00000100
-  beq MoveSpritesDown
+  bne @SkipDown
+  jsr MoveSpritesDown
+@SkipDown:
 
   lda controller1
   and #%00000010
   cmp #%00000010
-  beq MoveSpritesLeft
+  bne @SkipLeft
+  jsr MoveSpritesLeft
+@SkipLeft:
 
   lda controller1
   and #%00000001
   cmp #%00000001
-  beq MoveSpritesRight
+  bne @SkipRight
+  jsr MoveSpritesRight
+@SkipRight:
 
   lda controller1
   and #%10000000
   cmp #%10000000
-  jeq MoveSpritesRight
-  ;jeq ToggleInvisibility
+  jne @SkipA 
+  jsr ToggleInvisibility
+@SkipA:
 
   rts
 
 VBlankCycle:
-  lda PPU_staTUS 
+  lda PPU_STATUS 
   bpl VBlankCycle
   rts
 
@@ -192,7 +201,7 @@ Reset:
   sta sprite_y
 
 LoadPalettes:
-  lda PPU_staTUS 
+  lda PPU_STATUS 
   lda #$3F
   sta PPU_VRAM_ADDR2 
   lda #$00
@@ -217,7 +226,7 @@ LoadSprites:
   bne @LoadSpritesLoop
 
 LoadBackground:
-  lda PPU_staTUS
+  lda PPU_STATUS
   lda #$20
   sta $2006
   lda #$00
@@ -258,7 +267,7 @@ PPU_SETUP:
   ;;ora CRTL1_SPRITES_8x16
   ;ora CRTL1_BG_PT_ADDR_1
   ;;ora CRTL1_SP_PT_ADDR_1
-  ;;ora CRTL1_VRAM_inc
+  ;;ora CRTL1_VRAM_INC
   ;;ora CRTL1_BASE_NAMETABLE_2000
   ;;ora CRTL1_BASE_NAMETABLE_2400
   ;;ora CRTL1_BASE_NAMETABLE_2800
