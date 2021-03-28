@@ -1,0 +1,3 @@
+[submodule "nes-hello-world"]
+	path = nes-hello-world
+	url = https://github.com/thtroyer/nes-hello-world
