@@ -1,3 +1,6 @@
 [submodule "nes-hello-world"]
 	path = nes-hello-world
 	url = https://github.com/thtroyer/nes-hello-world
+[submodule "nes-simple-platformer"]
+	path = nes-simple-platformer
+	url = https://github.com/thtroyer/nes-simple-platformer
